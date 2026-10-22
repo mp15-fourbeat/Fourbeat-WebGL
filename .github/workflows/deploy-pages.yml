@@ -2,10 +2,16 @@
 name: Deploy Fourbeat WebGL
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Private Unity build run ID"
+        required: true
+        type: string
+      source_sha:
+        description: "Source commit SHA"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -14,7 +20,7 @@ permissions:
 
 concurrency:
   group: github-pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -26,14 +32,31 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Download Private WebGL Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Fourbeat-WebGL
+          repository: mp15-fourbeat/project
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.WEBGL_ARTIFACT_READ_TOKEN }}
+          path: ./webgl
+
+      - name: Verify WebGL Build
+        shell: bash
+        run: |
+          test -f ./webgl/index.html || {
+            echo "ERROR: index.html not found."
+            exit 1
+          }
+
+          echo "Source SHA: ${{ inputs.source_sha }}"
+          du -sh ./webgl
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: .
+          path: ./webgl
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
